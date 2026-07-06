@@ -1,51 +1,47 @@
-# Verdict — Modèle de scoring Pyrenex Crédit v2
+# Verdict — Pyrenex-risk-v2
 
-> Document destiné à Sophie Léger (Lead Data, Pyrenex Crédit).
-> 1 page max.
+## Décision
 
-## Contexte
+Je recommande de remplacer `Pyrenex-risk-v1` par `Pyrenex-risk-v2`, avec une phase de validation métier avant mise en production complète.
 
-(En une phrase : pourquoi ce travail, qu'est-ce qui était attendu.)
+## Comparaison chiffrée
 
-## Démarche
+| Modèle | Dataset d'évaluation | F1 macro | ROC-AUC | Recall défaut |
+|---|---|---:|---:|---:|
+| Pyrenex-risk-v1 | Test split 2017 | 0.5018 | 0.7296 | 0.0500 |
+| Pyrenex-risk-v2 balanced | Holdout 2025 | 0.6130 | 0.7371 | 0.6455 |
 
-(En 2-3 phrases : dataset utilisé, split, nombre de configurations testées,
-critères d'évaluation.)
+Le modèle v2 améliore nettement le F1 macro, qui passe de 0.5018 à 0.6130. Le ROC-AUC progresse légèrement, de 0.7296 à 0.7371. Le gain le plus important concerne la détection des défauts : le recall de la classe `Charged Off` passe de 0.05 à 0.6455.
 
-## Verdict chiffré
+## Matrice de confusion v2 sur holdout
 
-| Métrique | Baseline 2017 (Pyrenex-risk-v1) | Modèle retenu (v2) | Variation |
-|---|---|---|---|
-| F1 macro (holdout) | … | … | … |
-| F1 défaut | … | … | … |
-| ROC-AUC | … | … | … |
-| Recall défaut | … | … | … |
+|  | Prédit remboursé | Prédit défaut |
+|---|---:|---:|
+| Vrai remboursé | 3449 | 1448 |
+| Vrai défaut | 391 | 712 |
 
-**Configuration retenue** : (rappel des hyperparamètres principaux)
+Le modèle v2 détecte 712 défauts sur 1103, contre une baseline historique qui détectait seulement environ 5% des défauts. En contrepartie, il génère davantage de faux positifs : 1448 dossiers remboursés sont classés comme défaut potentiel.
 
-## Trade-off explicité au métier
+## Justification du choix
 
-(2-3 phrases : qu'est-ce que le client gagne ? qu'est-ce qu'il perd ?
-Par exemple : *« le rappel défaut passe de 14% à 61% — soit 4× plus de
-mauvais payeurs détectés — au prix d'une précision défaut qui passe de
-38% à 41%. En clair : pour rattraper plus de défauts, le modèle déclenche
-davantage de fausses alertes. »*)
+Le run retenu est la configuration `balanced` du `RandomForestClassifier` :
+
+- `n_estimators=200`
+- `max_depth=10`
+- `min_samples_leaf=10`
+- `class_weight="balanced"`
+- `random_state=42`
+
+Cette configuration est cohérente avec le problème principal identifié dans la baseline : la classe minoritaire `Charged Off` était très mal détectée. Le paramètre `class_weight="balanced"` permet de donner plus de poids à cette classe pendant l'entraînement.
 
 ## Précautions avant mise en production
 
-- Vérifier que le **schéma d'entrée** en production correspond exactement
-  au schéma d'entraînement (cf. `pyrenex_risk_v2.json` → `feature_columns`)
-- Re-évaluer le **seuil de décision** (0.5 par défaut) avec l'équipe
-  métier — un seuil 0.3 peut être plus adapté selon l'appétence au risque
-- Mettre en place un **monitoring** dès le déploiement (cf. M5/M6)
-- Surveiller les **variables sensibles** identifiées (FICO, état US,
-  revenu) — risque de disparate impact à auditer (M2/M7)
+Avant une mise en production complète, je recommande :
 
-## Recommandation
+1. Valider avec le métier le coût des faux positifs, car le modèle refuse ou alerte davantage de dossiers.
+2. Surveiller les métriques par classe en production, pas seulement l'accuracy.
+3. Auditer les variables sensibles ou quasi-sensibles comme `fico_range_low`, `annual_inc`, `emp_length` et `home_ownership`.
+4. Ajouter un suivi de dérive des données et des performances dans la future CI/CD.
+5. Conserver le modèle v1 comme rollback possible pendant la phase de transition.
 
-✅ **Remplacer Pyrenex-risk-v1** par v2 *OU* ⛔ **Ne pas remplacer** —
-choisis et justifie en une phrase.
-
----
-
-*Signé : <prenom> <nom>, FastIA, le YYYY-MM-DD*
+Conclusion : `Pyrenex-risk-v2` est meilleur pour l'objectif métier principal — détecter les défauts — mais son seuil de décision et son impact sur les faux positifs doivent être validés avant déploiement.
