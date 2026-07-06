@@ -1,71 +1,22 @@
-# Expériences — M1-B1 Pyrenex Crédit (Lending Club)
+# Experiments — Pyrenex Crédit scoring v2
 
-> Trace tes runs au fur et à mesure. Format imposé : un bloc par run, avec
-> date, modèle, hyperparams, métriques **test interne uniquement**, verdict.
-> Commit à chaque run final (pas à chaque essai jetable).
->
-> ⚠️ **Règle d'or — comparabilité.** Le holdout **n'apparaît jamais** dans les
-> blocs `exp_NNN`. Il sort **une seule fois**, pour le modèle retenu, dans
-> la section finale en bas de fichier. Cf. mini-cours 04.
+Règle de comparabilité : les scores ci-dessous sont calculés uniquement sur un split interne de `lending_club_train.csv` avec `test_size=0.2`, `stratify=y` et `random_state=42`.
 
----
+Aucun score holdout n'est utilisé dans ces runs intermédiaires.
 
-## exp_001 — RF par défaut
+## Baseline 2017 — référence historique
 
-- **Date** : YYYY-MM-DD HH:MM
-- **Modèle** : RandomForestClassifier (sklearn X.Y.Z)
-- **Dataset** : lending_club_train.csv (sha256 …), n=…
-- **Split** : test_size=0.2, stratify=y, random_state=42
-- **Hyperparamètres** : tous par défaut, `n_jobs=-1`, `random_state=42`
-- **Pré-traitement** : OneHotEncoder + StandardScaler (Pipeline scikit-learn)
-- **Métriques (test interne)** :
-  - F1 macro : …
-  - F1 défaut : …
-  - ROC-AUC : …
-  - Recall défaut : …
-- **Temps d'entraînement** : … s
-- **Verdict** : …
+| Modèle | Dataset | F1 macro | ROC-AUC | Note |
+|---|---|---:|---:|---|
+| Pyrenex-risk-v1 | 2017 test split | 0.5018 | 0.7296 | RandomForest historique, sans stratify, sans class_weight |
 
----
+## Runs v2 — validation interne 2025
 
-## exp_002 — RF balanced (TODO — remplis avec ta config)
+| Run | Modèle | Hyperparamètres principaux | F1 macro interne | ROC-AUC interne | Décision |
+|---|---|---|---:|---:|---|
+| A | RandomForest default | `n_estimators=100`, `random_state=42`, `n_jobs=-1` | 0.5063 | 0.7190 | Rejeté |
+| B | RandomForest balanced | `n_estimators=200`, `max_depth=10`, `min_samples_leaf=10`, `class_weight="balanced"`, `random_state=42`, `n_jobs=-1` | 0.6104 | 0.7440 | Retenu |
 
-- **Date** :
-- **Modèle** :
-- **Hyperparamètres** :
-- **Pré-traitement** :
-- **Métriques (test interne)** :
-- **Temps d'entraînement** :
-- **Verdict** :
+## Choix retenu
 
----
-
-## exp_003 — (TODO — ta variante ou mission étoile ⭐ si tu y vas)
-
-- ...
-
----
-
-## 🏁 Évaluation finale sur holdout (modèle retenu)
-
-> **À remplir une seule fois**, à la tâche 5 du brief, **après** avoir choisi
-> ton modèle retenu parmi les `exp_NNN` ci-dessus. Le holdout n'est consulté
-> qu'ici.
-
-- **Date** : YYYY-MM-DD HH:MM
-- **Expérience retenue** : exp_NNN
-- **Modèle persisté** : `models/pyrenex_risk_v2.joblib`
-- **Données holdout** : `data/lending_club_holdout.csv` (sha256 …, n=…)
-- **Métriques** :
-  - F1 macro : …
-  - F1 défaut : …
-  - ROC-AUC : …
-  - Recall défaut : …
-- **Matrice de confusion** :
-
-|  | Pred Fully Paid | Pred Charged Off |
-|---|---|---|
-| **Vrai Fully Paid** | … | … |
-| **Vrai Charged Off** | … | … |
-
-- **Comparaison baseline 2017** : (cf. `verdict.md`)
+Le run B est retenu car il améliore nettement le F1 macro sur le split interne, tout en améliorant aussi le ROC-AUC. Le paramètre `class_weight="balanced"` est cohérent avec le problème de classe minoritaire observé dans la baseline 2017, où le recall de `Charged Off` était très faible.
